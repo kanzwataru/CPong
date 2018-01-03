@@ -7,45 +7,11 @@
 //
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <SDL2/sdl.h>
+
+#include "globals.h"
 #include "helper_funcs.h"
-
-#define TRUE SDL_TRUE
-#define FALSE SDL_FALSE
-typedef SDL_bool BOOL;
-
-#define SCREEN_WIDTH 800
-#define SCREEN_HEIGHT 600
-#define FIXED_UPDATE_FPS 120
-#define MAX_FPS 60
-
-#define GATE_W 3
-#define GATE_H 5
-#define SCORE_W 10
-#define SCORE_H 30
-#define PADDLE_W 30
-#define PADDLE_H 120
-#define PADDLE_GAP 320
-#define BALL_SIZE 20
-
-#define PADDLE_ACCEL 0.1
-#define PADDLE_DECEL 0.01
-#define PADDLE_SPEED 10
-#define BALL_SPEED 3
-#define SMACK_FORCE_MULT 3
-#define AI_PREDICT_STEP 12
-
-const float TOP = 0;
-const float BTM = SCREEN_HEIGHT - PADDLE_H;
-const int SCREEN_HALF = SCREEN_WIDTH / 2;
-const int PLAYER_SCORE_X = 10;
-const int AI_SCORE_X = SCREEN_WIDTH - (2 * SCORE_W);
-const int SCORE_Y = 10;
-const int AI_MAX_REACT = SCREEN_WIDTH * 0.95;
-const int AI_MIN_REACT = SCREEN_WIDTH * 0.5;
-const int AI_PADDLE_UPPER_BOUND = PADDLE_H * 0.2;
-const int AI_PADDLE_LOWER_BOUND = PADDLE_H * 0.7;
-const unsigned int UPDATE_STEP_SIZE = 1000/FIXED_UPDATE_FPS;
 
 SDL_Window *window = NULL;
 SDL_Renderer *renderer = NULL;
@@ -66,16 +32,14 @@ typedef struct _ball {
     SDL_Rect rect;
     float direction_x;
     float direction_y;
-    BOOL start;
+    bool start;
 } Ball;
 
 Paddle player;
 Paddle ai;
 AIAttrs aiattrs;
 Ball ball;
-BOOL game_paused = FALSE;
-
-SDL_Rect debug_prediction;
+bool game_paused = false;
 
 float calc_speed(float current_speed, int direction)
 {
@@ -99,14 +63,14 @@ float away_from_paddle(Paddle *paddle)
 
 void calc_ball_paddle_collision(Paddle *paddle)
 {
-    BOOL bounce = FALSE;
+    bool bounce = false;
     float percent = remap(ball.rect.y + (ball.rect.h / 2),
                     paddle->rect.y,
                     paddle->rect.y + paddle->rect.h,
                     -1.0, 1.0);
 
     while(SDL_HasIntersection(&ball.rect, &paddle->rect)) {
-        bounce = TRUE;
+        bounce = true;
         
         ball.rect.x += away_from_paddle(paddle);
     }
@@ -120,18 +84,16 @@ void calc_ball_paddle_collision(Paddle *paddle)
             ball.direction_y = -percent + (paddle->speed * paddle->direction * SMACK_FORCE_MULT);
         }
     }
-    
-    
 }
 
 void calc_ball_collision()
 {
     if(ball.rect.x + ball.rect.w <= 0) {
-        ball.start = TRUE;
+        ball.start = true;
         ai.score++;
     }
     else if(ball.rect.x >= SCREEN_WIDTH) {
-        ball.start = TRUE;
+        ball.start = true;
         player.score++;
     }
     else if(ball.rect.y <= 0
@@ -185,12 +147,12 @@ int ai_decision()
     return 0;
 }
 
-BOOL handle_input()
+bool handle_input()
 {
     SDL_Event event;
     while(SDL_PollEvent(&event)) {
         if(event.type == SDL_QUIT) {
-            return FALSE;
+            return false;
         }
         if(event.type == SDL_KEYDOWN) {
             if(event.key.keysym.sym == SDLK_UP)
@@ -198,9 +160,9 @@ BOOL handle_input()
             else if(event.key.keysym.sym == SDLK_DOWN)
                 player.direction = 1;
             else if(event.key.keysym.sym == SDLK_SPACE)
-                ball.start = FALSE;
+                ball.start = false;
             else if(event.key.keysym.sym == SDLK_ESCAPE)
-                return FALSE;
+                return false;
             else if(event.key.keysym.sym == SDLK_p)
                 game_paused = !game_paused;
         }
@@ -209,7 +171,7 @@ BOOL handle_input()
                 player.direction = 0;
         }
     }
-    return TRUE;
+    return true;
 }
 
 void update()
@@ -226,30 +188,12 @@ void update()
     calc_ball_movement();
 }
 
-void debug_info()
-{
-     SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-     
-     SDL_Rect prediction_rect;
-     prediction_rect.x = aiattrs.prediction.x;
-     prediction_rect.y = aiattrs.prediction.y;
-     prediction_rect.h = ball.rect.h;
-     prediction_rect.w = ball.rect.w;
-     SDL_RenderDrawRect(renderer, &prediction_rect);
-}
-
 void render()
 {
-    if(game_paused)
-        SDL_SetRenderDrawColor(renderer, 64, 64, 64, 255);
-    else
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
     
-    if(game_paused)
-        SDL_SetRenderDrawColor(renderer, 128, 128, 128, 255);
-    else
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderFillRect(renderer, &player.rect);
     SDL_RenderFillRect(renderer, &ai.rect);
     SDL_RenderFillRect(renderer, &ball.rect);
@@ -270,6 +214,7 @@ void render()
         SDL_RenderFillRect(renderer, &rect);
     }
     
+    /* draw vertical lines */
     rect.h = GATE_H;
     rect.w = GATE_W;
     for(int i = 0; i < 60; i++) {
@@ -278,12 +223,23 @@ void render()
         SDL_RenderFillRect(renderer, &rect);
     }
     
+    /* pause grayout */
+    if(game_paused) {
+        SDL_Rect grayout = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
+        
+        SDL_SetRenderDrawColor(renderer, 128, 128, 128, 200);
+        
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        SDL_RenderFillRect(renderer, &grayout);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    }
+    
     SDL_RenderPresent(renderer);
 }
 
 void game_loop()
 {
-    BOOL running = TRUE;
+    bool running = true;
     unsigned int last_time = 0;
     unsigned int accumulator = 0;
     unsigned int current_time;
@@ -322,7 +278,7 @@ void init_game()
     
     ball.rect.h = BALL_SIZE;
     ball.rect.w = BALL_SIZE;
-    ball.start = TRUE;
+    ball.start = true;
     ball.direction_x = 1;
     ball.direction_y = 1;
     
